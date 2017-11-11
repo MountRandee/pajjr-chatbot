@@ -18,6 +18,7 @@ const
   https = require('https'),  
   request = require('request'),
   Shopify = require('shopify-api-node');
+  require('dotenv').config()
 
 var app = express();
 app.set('port', process.env.PORT || 5000);
@@ -177,7 +178,21 @@ app.post('/webhook', function (req, res) {
         if (messagingEvent.message) {
           // someone sent a message
           receivedMessage(messagingEvent);
+	  var entityValueDict = extractEntities(messagingEvent.message);
+	  for (var k in entityValueDict) {
+	    console.log(k + ':' + entityValueDict[k]);
+	  }
+	  var userMessage = messagingEvent.message.text;
+	  console.log(userMessage);
 
+	  var intent = entityValueDict['intent'];
+	  if (intent === 'search') {
+	    searchHandler(entityValueDict, userMessage);
+	  } else if (intent === 'support') {
+	    supportHandler(entityValueDict, userMessage);
+	  } else {
+	    unknownHandler(userMessage);
+	  }
         } else if (messagingEvent.delivery) {
           // messenger platform sent a delivery confirmation
           receivedDeliveryConfirmation(messagingEvent);
@@ -194,6 +209,32 @@ app.post('/webhook', function (req, res) {
     });
   }
 });
+
+function supportHandler(entityValueDict, userMessage) {
+console.log('supportHandler');
+
+}
+
+function searchHandler(entityValueDict, userMessage) {
+console.log('searchHandler');
+}
+
+function unknownHandler(userMessage) {
+console.log('unknownHandler');
+}
+
+function extractEntities(message) {
+  var entities = message.nlp.entities;
+  var res = {};
+  for (var j in entities) {
+    var key = j;
+    var value = entities[j][0].value;
+    // console.log(key);
+    // console.log(value);
+    res[key] = value;
+  }
+  return res;
+}
 
 /*
  * Message Event
