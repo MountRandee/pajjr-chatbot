@@ -187,8 +187,8 @@ app.post('/webhook', function (req, res) {
 
 	  var intent = entityValueDict['intent'];
 	  if (intent === 'search') {
-	    searchHandler(entityValueDict, userMessage);
-	  } else if (intent === 'support') {
+	    searchHandler(entityValueDict, userMessage, messagingEvent);
+	  } if (intent === 'support') {
 	    supportHandler(entityValueDict, userMessage);
 	  } else {
 	    unknownHandler(userMessage);
@@ -215,12 +215,69 @@ console.log('supportHandler');
 
 }
 
-function searchHandler(entityValueDict, userMessage) {
-console.log('searchHandler');
+function searchHandler(entityValueDict, userMessage, messagingEvent) {
+  console.log('searchHandler');
+  listProducts(messagingEvent.sender.id, entityValueDict);
 }
 
 function unknownHandler(userMessage) {
-console.log('unknownHandler');
+  console.log('unknownHandler');
+}
+
+function listProducts(recipientId, entityValueDict) {
+  var templateElements = [];
+  var products = shopify.product.list();
+  var sectionButton = function(title, action, options) {
+    var payload = options | {};
+    payload = Object.assign(options, {action: action});
+    return {
+      type: 'postback',
+      title: title,
+      payload: JSON.stringify(payload)
+    };
+  }
+  
+  products.then(function(listOfProducts) {
+    var nlpTags = entityValueDict['tags'];
+    var taggedProducts = listOfProducts.filter(function(product) {
+        return product.tags.includes(nlpTags)
+    });
+
+    taggedProducts.forEach(function(product) {
+      var url = HOST_URL + "/product.html?id="+product.id;
+      templateElements.push({
+        title: product.title,
+        subtitle: product.tags,
+        image_url: product.image.src,
+        buttons:[
+          {
+            "type":"web_url",
+            "url": url,
+            "title":"Read description",
+            "webview_height_ratio": "compact",
+            "messenger_extensions": "true"
+          }
+        ]
+      });
+    });
+
+    var messageData = {
+      recipient: {
+        id: recipientId
+      },
+      message: {
+        attachment: {
+          type: "template",
+          payload: {
+            template_type: "generic",
+            elements: templateElements
+          }
+        }
+      }
+    };
+
+    callSendAPI(messageData);
+  });
 }
 
 function extractEntities(message) {
@@ -253,7 +310,7 @@ function receivedMessage(event) {
   console.log("[receivedMessage] user (%d) page (%d) timestamp (%d) and message (%s)", 
     senderID, pageID, timeOfMessage, JSON.stringify(message));
 
-  if (message.quick_reply) {
+    if (message.quick_reply) {
     console.log("[receivedMessage] quick_reply.payload (%s)", 
       message.quick_reply.payload);
     handleQuickReplyResponse(event);
@@ -269,7 +326,6 @@ function receivedMessage(event) {
       case 'help':
         sendHelpOptionsAsButtonTemplates(senderID);
         break;
-      
       default:
         // otherwise, just echo it back to the sender
         sendTextMessage(senderID, messageText);
